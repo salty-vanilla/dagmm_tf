@@ -9,8 +9,7 @@ class AutoEncoder(tf.keras.Model):
                  normalization='batch',
                  downsampling='stride',
                  upsampling='deconv',
-                 is_dropout=False,
-                 is_training=True):
+                 is_dropout=False):
         self._input_shape = input_shape
         self.latent_dim = latent_dim
         self.first_filters = first_filters
@@ -19,7 +18,6 @@ class AutoEncoder(tf.keras.Model):
         self.downsampling = downsampling
         self.upsampling = upsampling
         self.is_dropout = is_dropout
-        self.is_training = is_training
 
         self.conv_block_params = {'kernel_initializer': 'he_normal',
                                   'activation_': 'relu',
@@ -35,20 +33,27 @@ class AutoEncoder(tf.keras.Model):
 
     def call(self, x,
              reuse=False,
-             **kwargs):
-        return self.decode(self.encode(x, reuse=reuse), reuse=reuse)
+             is_training=True):
+        return self.decode(self.encode(x,
+                                       reuse=reuse,
+                                       is_training=is_training),
+                           reuse=reuse,
+                           is_training=is_training)
 
     def encode(self, x,
-               reuse=False):
+               reuse=False,
+               is_training=True):
         raise NotImplementedError
 
     def decode(self, x,
-               reuse=False):
+               reuse=False,
+               is_training=True):
         raise NotImplementedError
 
     def calc_distance(self, y_true,
                       y_pred,
-                      reuse=False):
+                      reuse=False,
+                      is_training=True):
         raise NotImplementedError
 
     @property

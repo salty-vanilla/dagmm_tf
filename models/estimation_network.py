@@ -6,13 +6,11 @@ class EstimationNetwork(tf.keras.Model):
     def __init__(self, input_shape,
                  dense_units,
                  normalization='batch',
-                 is_dropout=False,
-                 is_training=True,):
+                 is_dropout=False):
         self._input_shape = input_shape
         self.dense_units = dense_units
         self.normalization = normalization
         self.is_dropout = is_dropout
-        self.is_training = is_training
 
         self.dense_params = {'kernel_initializer': 'he_normal',
                              'activation_': 'relu',
@@ -22,20 +20,20 @@ class EstimationNetwork(tf.keras.Model):
 
     def call(self, x,
              reuse=False,
-             **kwargs):
+             is_training=True):
         for u in self.dense_units[:-1]:
             x = dense(x, u)
             x = activation(x, self.dense_params['activation_'])
             if self.dense_params['normalization'] is not None:
                 if self.dense_params['normalization'] == 'batch':
-                    x = batch_norm(x, self.is_training)
+                    x = batch_norm(x, is_training)
                 elif self.dense_params['normalization'] == 'layer':
-                    x = layer_norm(x, self.is_training)
+                    x = layer_norm(x, is_training)
                 else:
                     raise ValueError
 
             if self.is_dropout:
-                x = dropout(x, 0.5, self.is_training)
+                x = dropout(x, 0.5, is_training)
         return dense(x, self.dense_units[-1], activation_='softmax')
 
     @property
