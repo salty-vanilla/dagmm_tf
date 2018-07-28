@@ -16,71 +16,71 @@ class DAGMM:
         self.estimation_network = estimation_network
         self.gmm = gmm
 
-        with tf.Graph().as_default() as graph:
-            self.x = Input(shape=self.autoencoder._input_shape,
-                           dtype=tf.float32)
+        # with tf.Graph().as_default() as graph:
+        self.x = tf.placeholder(tf.float32,
+                                shape=[None, *self.autoencoder.input_shape])
 
-            with tf.name_scope('train'):
-                is_training = True
-                reuse = False
-                self.encoded = self.autoencoder.encode(self.x,
-                                                       is_training=is_training,
-                                                       reuse=reuse)
-                self.decoded = self.autoencoder.decode(self.encoded,
-                                                       is_training=is_training,
-                                                       reuse=reuse)
-                self.distance = self.autoencoder.calc_distance(self.x,
-                                                               self.decoded,
-                                                               is_training=is_training,
-                                                               reuse=reuse)
+        with tf.name_scope('train'):
+            is_training = True
+            reuse = False
+            self.encoded = self.autoencoder.encode(self.x,
+                                                   is_training=is_training,
+                                                   reuse=reuse)
+            self.decoded = self.autoencoder.decode(self.encoded,
+                                                   is_training=is_training,
+                                                   reuse=reuse)
+            self.distance = self.autoencoder.calc_distance(self.x,
+                                                           self.decoded,
+                                                           is_training=is_training,
+                                                           reuse=reuse)
+            self.z = tf.concat([self.encoded, self.distance], axis=-1)
 
-                self.z = tf.concat([self.encoded, self.distance], axis=-1)
+            self.gamma = self.estimation_network(self.z,
+                                                 is_training=is_training,
+                                                 reuse=reuse)
 
-                self.gamma = self.estimation_network(self.z,
-                                                     is_training=is_training,
-                                                     reuse=reuse)
+            self.gmm.build(self.z, self.gamma)
+            self.energy = self.gmm.calc_energy(self.z, is_training)
 
-                self.gmm.build(self.z, self.gamma)
-                self.energy = self.gmm.calc_energy(is_training)
+        with tf.name_scope('test'):
+            is_training = False
+            reuse = True
+            self._encoded = self.autoencoder.encode(self.x,
+                                                    is_training=is_training,
+                                                    reuse=reuse)
+            self._decoded = self.autoencoder.decode(self._encoded,
+                                                    is_training=is_training,
+                                                    reuse=reuse)
+            self._distance = self.autoencoder.calc_distance(self.x,
+                                                            self._decoded,
+                                                            is_training=is_training,
+                                                            reuse=reuse)
 
-            with tf.name_scope('test'):
-                is_training = False
-                reuse = True
-                self._encoded = self.autoencoder.encode(self.x,
-                                                        is_training=is_training,
-                                                        reuse=reuse)
-                self._decoded = self.autoencoder.decode(self._encoded,
-                                                        is_training=is_training,
-                                                        reuse=reuse)
-                self._distance = self.autoencoder.calc_distance(self.x,
-                                                                self._decoded,
-                                                                is_training=is_training,
-                                                                reuse=reuse)
+            self._z = tf.concat([self._encoded, self._distance], axis=-1)
 
-                self._z = tf.concat([self._encoded, self._distance], axis=-1)
+            self._gamma = self.estimation_network(self._z,
+                                                  is_training=is_training,
+                                                  reuse=reuse)
 
-                self._gamma = self.estimation_network(self._z,
-                                                      is_training=is_training,
-                                                      reuse=reuse)
+            self._energy = self.gmm.calc_energy(self._z, is_training)
 
-                self._energy = self.gmm.calc_energy(is_training)
+        with tf.name_scope('losses'):
+            self.mse = tf.reduce_mean((self.x-self.decoded)**2)
+            self.energy_loss = tf.reduce_mean(self.energy)
+            self.diag_loss = self.gmm.cov_diag_loss()
+            self.loss = self.mse + lambda1*self.energy_loss + lambda2*self.diag_loss
 
-            with tf.name_scope('losses'):
-                self.mse = tf.reduce_mean((self.x-self.decoded)**2)
-                self.energy_loss = tf.reduce_mean(self.energy)
-                self.diag_loss = self.gmm.cov_diag_loss()
-                self.loss = self.mse + lambda1*self.energy_loss + lambda2*self.diag_loss
+        with tf.variable_scope('Summary'):
+            self.summary = tf.summary.merge([tf.summary.scalar('mse', self.mse),
+                                             tf.summary.scalar('energy_loss', self.energy_loss),
+                                             tf.summary.scalar('diag_loss', self.diag_loss)])
 
-            with tf.variable_scope('Summary'):
-                self.summary = tf.summary.merge([tf.summary.scalar('mse', self.mse),
-                                                 tf.summary.scalar('energy_loss', self.energy_loss),
-                                                 tf.summary.scalar('diag_loss', self.diag_loss)])
+        self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
 
-            self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
-
-            self.sess = tf.Session(graph=graph)
-            self.sess.run(tf.global_variables_initializer())
-            self.saver = tf.train.Saver()
+        # self.sess = tf.Session(graph=graph)
+        self.sess = tf.Session()
+        self.sess.run(tf.global_variables_initializer())
+        self.saver = tf.train.Saver()
 
     def fit(self, image_sampler,
             nb_epoch=100,

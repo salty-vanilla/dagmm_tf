@@ -2,7 +2,7 @@ import tensorflow as tf
 from ops.layers import dense, batch_norm, layer_norm, dropout, activation
 
 
-class EstimationNetwork(tf.keras.Model):
+class EstimationNetwork():
     def __init__(self, input_shape,
                  dense_units,
                  normalization='batch',
@@ -11,16 +11,15 @@ class EstimationNetwork(tf.keras.Model):
         self.dense_units = dense_units
         self.normalization = normalization
         self.is_dropout = is_dropout
+        self.name='model/estimation_network'
 
         self.dense_params = {'kernel_initializer': 'he_normal',
                              'activation_': 'relu',
                              'normalization': self.normalization}
 
-        super().__init__(name='model/estimation_network')
-
-    def call(self, x,
-             reuse=False,
-             is_training=True):
+    def __call__(self, x,
+                 reuse=False,
+                 is_training=True):
         for u in self.dense_units[:-1]:
             x = dense(x, u)
             x = activation(x, self.dense_params['activation_'])
